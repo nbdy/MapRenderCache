@@ -17,4 +17,4 @@ set_target_properties(MapRenderCache PROPERTIES PUBLIC_HEADER "MapRenderCache.h"
 install(TARGETS MapRenderCache
         DESTINATION ${PYTHON_SITE}
         PUBLIC_HEADER DESTINATION MapRenderCache
-        DESTINATION )
+        )
