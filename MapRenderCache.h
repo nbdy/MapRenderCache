@@ -44,12 +44,10 @@ class MapRenderCache {
     }
   }
 
-  std::filesystem::path getTileFilename(double i_dX, double i_dY, int32_t i_i32Z, uint32_t i_u32Width, uint32_t i_u32Height) {
+  std::filesystem::path getTileFilename(int32_t i_dX, int32_t i_dY, int32_t i_i32Z, uint32_t i_u32Width, uint32_t i_u32Height) {
     std::stringstream r;
-    auto x = floor(i_dX * 1000) / 1000;
-    auto y = floor(i_dY * 1000) / 1000;
-    r << "x" << std::to_string(x);
-    r << "y" << std::to_string(y);
+    r << "x" << std::to_string(i_dX);
+    r << "y" << std::to_string(i_dY);
     r << "z" << std::to_string(i_i32Z);
     r << "w" << std::to_string(i_u32Width);
     r << "h" << std::to_string(i_u32Height);
@@ -65,14 +63,14 @@ class MapRenderCache {
   }
 
   void renderImage(double i_dX, double i_dY, uint32_t i_i32Z, const std::string& i_sFilePath) {
-    mapnik::image_rgba8 m_RenderedImage(static_cast<int>(m_u32RenderedImageWidth), static_cast<int>(m_u32RenderedImageHeight));
-    mapnik::agg_renderer<mapnik::image_rgba8> m_Renderer(m_Map, m_RenderedImage);
+    mapnik::image_rgba8 img(static_cast<int>(m_u32RenderedImageWidth), static_cast<int>(m_u32RenderedImageHeight));
+    mapnik::agg_renderer<mapnik::image_rgba8> renderer(m_Map, img);
     m_Map.set_aspect_fix_mode(mapnik::Map::aspect_fix_mode::ADJUST_BBOX_HEIGHT);
     double _z = i_i32Z;
     m_Transform.forward(i_dX, i_dY, _z);
     m_Map.zoom_to_box(getBoundingBox(i_dX, i_dY, i_i32Z));
-    m_Renderer.apply();
-    mapnik::save_to_file(m_RenderedImage, i_sFilePath, "png8");
+    renderer.apply();
+    mapnik::save_to_file(img, i_sFilePath, "png8");
   }
 
   static std::filesystem::path getMapnikInputPath(const std::string& i_sType) {
@@ -100,8 +98,6 @@ class MapRenderCache {
                                                        m_Map(i_i32Width, i_i32Height),
                                                        m_u32RenderedImageWidth(i_i32Width),
                                                        m_u32RenderedImageHeight(i_i32Height),
-                                                       // m_RenderedImage(i_i32Width, i_i32Height),
-                                                       // m_Renderer(m_Map, m_RenderedImage),
                                                        m_CacheDirectory("cache")
   {
     setup();
@@ -115,19 +111,48 @@ class MapRenderCache {
                                                        m_Map(i_i32Width, i_i32Height),
                                                        m_u32RenderedImageWidth(i_i32Width),
                                                        m_u32RenderedImageHeight(i_i32Height),
-                                                       // m_RenderedImage(i_i32Width, i_i32Height),
-                                                       // m_Renderer(m_Map, m_RenderedImage),
                                                        m_CacheDirectory(i_sCacheDirectory)
   {
     setup();
   };
 
-  std::string getTile(double i_dX, double i_dY, int32_t i_i32Z) {
-    auto fp = absolute(getTileFilename(i_dX, i_dY, i_i32Z, m_u32RenderedImageWidth, m_u32RenderedImageHeight));
+  std::string getTile(int32_t i_i32X, int32_t i_i32Y, int32_t i_i32Z) {
+    auto fp = absolute(getTileFilename(i_i32X, i_i32Y, i_i32Z, m_u32RenderedImageWidth, m_u32RenderedImageHeight));
     if (!std::filesystem::exists(fp)) {
-      renderImage(i_dX, i_dY, i_i32Z, fp);
+      renderImage(i_i32X, i_i32Y, i_i32Z, fp);
     }
     return fp;
+  }
+
+  // https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+  // -----
+  static int32_t longitude2x(double i_dLongitude, int32_t i_i32Z)
+  {
+    return (int)(floor((i_dLongitude + 180.0) / 360.0 * (1 << i_i32Z)));
+  }
+
+  static int32_t latitude2y(double i_dLatitude, int32_t i_i32Z)
+  {
+    double lr = i_dLatitude * M_PI/180.0;
+    return (int)(floor((1.0 - asinh(tan(lr)) / M_PI) / 2.0 * (1 << i_i32Z)));
+  }
+
+  static double x2longitude(int32_t i_i32X, int32_t i_i32Z)
+  {
+    return i_i32X / (double)(1 << i_i32Z) * 360.0 - 180;
+  }
+
+  static double y2latitude(int32_t i_i32X, int32_t i_i32Z)
+  {
+    double n = M_PI - 2.0 * M_PI * i_i32X / (double)(1 << i_i32Z);
+    return 180.0 / M_PI * atan(0.5 * (exp(n) - exp(-n)));
+  }
+  // -----
+
+  std::string getTile(double i_dLongitude, double i_dLatitude, int32_t i_i32Z) {
+    auto x = longitude2x(i_dLongitude, i_i32Z);
+    auto y = latitude2y(i_dLatitude, i_i32Z);
+    return getTile(x, y, i_i32Z);
   }
 };
 

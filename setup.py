@@ -122,7 +122,7 @@ class CMakeBuild(build_ext):
 setup(
     long_description=open("README.md", "r").read(),
     name="MapRenderCache",
-    version="0.1",
+    version="0.2",
     description="mapnik render cache",
     author="Pascal Eberlein",
     author_email="pascal@eberlein.io",
